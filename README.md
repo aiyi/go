@@ -1,1 +1,1 @@
-Toolkits in go
+Common libraries for writing Go services/applications.
