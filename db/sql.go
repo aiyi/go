@@ -3,8 +3,6 @@ package db
 import (
 	"bytes"
 	"reflect"
-
-	"github.com/aiyi/go/utils"
 )
 
 func SqlUpdateSetArgs(s *bytes.Buffer, para interface{}, args *[]interface{}) int {
@@ -21,7 +19,8 @@ func SqlUpdateSetArgs(s *bytes.Buffer, para interface{}, args *[]interface{}) in
 			if x > 0 {
 				s.WriteString(", ")
 			}
-			s.WriteString(utils.ToFieldName(v.Type().Field(i).Name))
+
+			s.WriteString(v.Type().Field(i).Tag.Get("json"))
 			s.WriteString("=?")
 			if field.Kind() == reflect.Ptr {
 				*args = append(*args, field.Elem().Interface())
