@@ -2,10 +2,7 @@ package utils
 
 import (
 	"reflect"
-//	"reflect"
-	"errors"
 	"fmt"
-	"strings"
 	"encoding/json"
 	
 	"github.com/antonholmquist/jason"
@@ -41,6 +38,7 @@ func valString(v interface{}) (s string) {
 		}
 	case string:
 		s, _ = v.(string)
+		s = "'" + s + "'"
 	case json.Number:
 		n, _ := v.(json.Number)
 		s = n.String()
@@ -80,7 +78,7 @@ func (w *Where) SqlString() string {
 	// condition number
 	cn := len(*w)
 
-	s := "where "
+	s := ""
 	for i, c := range *w {
 		// keyword number
 		kn := len(*c)
@@ -95,7 +93,7 @@ func (w *Where) SqlString() string {
 			
 			s += "("
 			for j, ei := range *cv {
-				s += ck + " " + opString(ei.op) + " " + valString(ei.value)
+				s += ck + opString(ei.op) + "?"
 				if en > 1 && j < en - 1 {
 					s += " AND "
 				}
@@ -118,12 +116,12 @@ func (w *Where) SqlString() string {
 }
 
 func (w *Where) Values() []interface{} {
-	ia := make([]interface{}, 4)
+	ia := make([]interface{}, 0)
 
 	for _, c := range *w {		
 		for _, cv := range *c {		
 			for _, ei := range *cv {
-				ia = append(ia, valString(ei.value))
+				ia = append(ia, ei.value)
 			}
 		}
 	}
@@ -194,24 +192,14 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 	return c, nil
 }
 
-func (w *Where) ParseWhere(str string) (err error) {
-	sa := strings.Split(str, "=")
-	if len(sa) != 2 {
-		fmt.Println("invalid str")
-		return errors.New("invalid query string")
-	}
-		
-	root, err := jason.NewObjectFromBytes([]byte(sa[1]))
+func (w *Where) ParseWhere(str string) (err error) {	
+	root, err := jason.NewObjectFromBytes([]byte(str))
 	if err != nil {
 		fmt.Println("parse json failed")
 		return err
 	}
 		
-	oa, err := root.GetObjectArray("or")
-	if err != nil {
-		fmt.Println("get or failed")
-		return err
-	}
+	oa, _ := root.GetObjectArray("or")
 	if oa == nil {
 		c, err := parseCondition(root)
 		if err != nil {
