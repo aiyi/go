@@ -42,8 +42,18 @@ func valString(v interface{}) (s string) {
 	case json.Number:
 		n, _ := v.(json.Number)
 		s = n.String()
+	case []*jason.Value:
+		a, _ := v.([]*jason.Value)
+		s = "["
+		for i, ai := range a {			
+			s += valString(ai.Interface())
+			if i < len(a) -1 {
+				s +=  ", "
+			}
+		}
+		s += "]"
 	default:
-		fmt.Println("unknown type? don't know how to convert")
+		fmt.Println("unknown type? don't know how to convert: ", reflect.ValueOf(v).Type())
 		s = ""
 	}
 	
@@ -52,21 +62,21 @@ func valString(v interface{}) (s string) {
 
 func opString(op string) (string) {
 	switch op {
-	case "eq":
+	case "$eq":
 		return "="
-	case "lt":
+	case "$lt":
 		return "<"
-	case "lte":
+	case "$lte":
 		return "<="
-	case "gt":
+	case "$gt":
 		return ">"
-	case "gte":
+	case "$gte":
 		return ">="
-	case "ne":
+	case "$ne":
 		return "<>"
-	case "in":
+	case "$in":
 		return "IN"
-	case "nin":
+	case "$nin":
 		return "NOT IN"
 	default:
 		fmt.Println(op, " not found")
@@ -93,7 +103,7 @@ func (w *Where) SqlString() string {
 			
 			s += "("
 			for j, ei := range *cv {
-				s += ck + opString(ei.op) + "?"
+				s += ck + " " + opString(ei.op) + " " + "?"
 				if en > 1 && j < en - 1 {
 					s += " AND "
 				}
@@ -154,8 +164,11 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 	c = &Condition{}
 			
 	for ck, cv := range conds.Map() {
-		eo, _ := cv.Object()
-				
+		eo, err := cv.Object()
+		if err != nil {
+			return nil, err
+		}
+		
 		ea := make([]Expression, len(eo.Map()))
 		
 		i := 0
@@ -195,7 +208,7 @@ func (w *Where) ParseWhere(str string) (err error) {
 		return err
 	}
 		
-	oa, _ := root.GetObjectArray("or")
+	oa, _ := root.GetObjectArray("$or")
 	if oa == nil {
 		c, err := parseCondition(root)
 		if err != nil {
