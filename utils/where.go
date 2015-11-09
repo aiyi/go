@@ -8,8 +8,8 @@ import (
 	"github.com/antonholmquist/jason"
 )
 
-// where = {key1: [{op: val}, {op: val}], key2: [{op: val}, {op: val}], ...}
-// where = {or: [{key1: [{op: val}, {op: val}, ...], ...}, {key1: [{op: val}, {op: val}], ...}]}
+// where = {key1: {op: val, op: val}, key2: {op: val, op: val}, ...}
+
 type Expression struct {
 	op string
 	value interface{}
@@ -152,41 +152,37 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 	}
 	
 	c = &Condition{}
-		
-	for ck, cv := range conds.Map() {		
-		ea, _ := cv.Array()
-		if (ea == nil) {
-			continue
-		}
-		
-		es := make([]Expression, len(ea))
-		
-		for i, ai := range ea {
-			expr, _ := ai.Object()
-			for ek, ev := range expr.Map() {						
-				e := &Expression{}
-				e.op = ek
+			
+	for ck, cv := range conds.Map() {
+		eo, _ := cv.Object()
 				
-				switch ev.Interface().(type) {
-				case []interface{}:
-					e.value, _ = ev.Array()
-				case bool:
-					e.value, _ = ev.Boolean()
-				case string:
-					e.value, _ = ev.String()
-				case json.Number:
-					e.value, _ = ev.Number()
-				default:
-					e.value = ev.Interface()
-					fmt.Println(ev, " unsupported type ", 
-						reflect.ValueOf(ev.Interface()).Type())
-				}
-				
-				es[i] = *e
+		ea := make([]Expression, len(eo.Map()))
+		
+		i := 0
+		for ek, ev := range eo.Map() {			
+			e := &Expression{}
+			e.op = ek
+			
+			switch ev.Interface().(type) {
+			case []interface{}:
+				e.value, _ = ev.Array()
+			case bool:
+				e.value, _ = ev.Boolean()
+			case string:
+				e.value, _ = ev.String()
+			case json.Number:
+				e.value, _ = ev.Number()
+			default:
+				e.value = ev.Interface()
+				fmt.Println(ev, " unsupported type ", 
+					reflect.ValueOf(ev.Interface()).Type())
 			}
+			
+			ea[i] = *e
+			i += 1
 		}
-				
-		(*c)[ck] = &es
+								
+		(*c)[ck] = &ea
 	}
 	
 	return c, nil
