@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"fmt"
 	"strings"
+	"strconv"
 	"encoding/json"
 	
 	"github.com/antonholmquist/jason"
@@ -18,11 +19,17 @@ type Expression struct {
 }
 type Condition map[string]*[]Expression
 type Where []*Condition
+
+type Order struct {
+	key	string
+	asc	bool
+}
+
 type Filter struct {
 	where			*Where
-	orders          []string
-	offset          string
-	limit           string
+	orders          []*Order
+	skip          	int64
+	limit           int64
 	unscoped        bool
 	SoftDelete      bool
 }
@@ -187,26 +194,6 @@ func (f *Filter) SqlString() (string, []interface{}) {
 	return s, ia
 }
 
-func (w *Where) Values() []interface{} {
-	var ia []interface{}
-
-	for _, c := range *w {
-		for _, cv := range *c {
-			for j, ei := range *cv {
-				fmt.Println(j, ei.op)
-				
-				switch ei.value.(type) {
-				case []*jason.Value:
-					ei.value = valArray(ei.value)
-				default:
-				}
-				ia = append(ia, ei.value)
-			}
-		}
-	}
-	return ia
-}
-
 func (w Where) String() string {
 	s := ""
 	for _, c := range w {
@@ -311,29 +298,51 @@ func (f *Filter) ParseWhere(str string) (err error) {
 
 func (f *Filter) ParseOrder(str string) (err error) {
 	sa := strings.Split(str, "=")
-	if len(sa) <= 1 {
+	if len(sa) <= 1 || len(sa) > 2 {
 		return nil
 	}
+	
+	orders := []*Order{}
+	
+	for _, o := range sa[1:] {
+		order := &Order{}
+		
+		if o[0] == '-' {
+			order.asc = false
+			order.key = o[1:]
+		} else {
+			order.asc = true
+			order.key = o[:]
+		}
+		
+		orders = append(orders, order)
+	}
+	
+	f.orders = orders
 	
 	return nil
 }
 
 func (f *Filter) ParseLimit(str string) (err error) {
 	sa := strings.Split(str, "=")
-	if len(sa) <= 1 {
+	if len(sa) <= 1 || len(sa) > 2 {
 		return nil
 	}
 	
-	return nil
+	f.limit, err = strconv.ParseInt(sa[1], 10, 64)
+	
+	return err
 }
 
 func (f *Filter) ParseSkip(str string) (err error) {
 	sa := strings.Split(str, "=")
-	if len(sa) <= 1 {
+	if len(sa) <= 1 || len(sa) > 2 {
 		return nil
 	}
 	
-	return nil
+	f.skip, err = strconv.ParseInt(sa[1], 10, 64)
+	
+	return err
 }
 
 func Parse(c *gin.Context) (f *Filter, err error) {
