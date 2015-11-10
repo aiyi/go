@@ -3,9 +3,11 @@ package utils
 import (
 	"reflect"
 	"fmt"
+	"strings"
 	"encoding/json"
 	
 	"github.com/antonholmquist/jason"
+	"github.com/gin-gonic/gin"
 )
 
 // where = {key1: {op: val, op: val}, key2: {op: val, op: val}, ...}
@@ -17,10 +19,47 @@ type Expression struct {
 type Condition map[string]*[]Expression
 type Where []*Condition
 type Filter struct {
-     where Where
+	where			*Where
+	orders          []string
+	offset          string
+	limit           string
+	unscoped        bool
+	SoftDelete      bool
 }
 
 var opMap map[string]string
+
+func valItem(item interface{}) interface{} {
+	switch item.(type) {
+	case bool:
+		b, _ := item.(bool)
+		return b
+	case string:
+		s, _ := item.(string)
+		return s
+	case json.Number:
+		n, _ := item.(json.Number)
+		i, _ := n.Int64()
+		return i
+	default:
+		fmt.Println("valItem parse failed, type: ", reflect.ValueOf(item).Type())
+		return nil
+	}
+}
+
+func valArray(v interface{}) (a []interface{}) {
+	switch v.(type) {
+	case []*jason.Value:
+		va, _ := v.([]*jason.Value)
+		for _, item := range va {
+			a = append(a, valItem(item.Interface()))
+		}
+	default:
+		fmt.Println("valArray parse failed, type: ", reflect.ValueOf(v).Type())
+	}
+	
+	return a
+}
 
 func valString(v interface{}) (s string) {
 	switch v.(type) {
@@ -84,26 +123,49 @@ func opString(op string) (string) {
 	}
 }
 
-func (w *Where) SqlString() string {
+func (f *Filter) SqlString() (string, []interface{}) {
+	var ia []interface{}
+	
 	// condition number
-	cn := len(*w)
+	cn := len(*f.where)
 
 	s := ""
-	for i, c := range *w {
+	for i, conds := range *f.where {
 		// keyword number
-		kn := len(*c)
+		kn := len(*conds)
 		ki := 0
 		
 		s += "("
-		for ck, cv := range *c {
+		for ck, cv := range *conds {
 			// expression number
 			en := len(*cv)
 			
 			// TODO check whether ck is a filed of struct
 			
 			s += "("
-			for j, ei := range *cv {
-				s += ck + " " + opString(ei.op) + " " + "?"
+			for j, exp := range *cv {
+				// operation
+				if exp.op == "$in" || exp.op == "$nin" {
+					va, ok := exp.value.([]*jason.Value)
+					if !ok {
+						fmt.Println("in value wrong, not a array")
+					}
+
+					s += ck + " " + opString(exp.op) + " " + "("
+					
+					for k, ei := range valArray(exp.value) {
+						s += "?"
+						if k != len(va) - 1 {
+							s += ","
+						}
+						ia = append(ia, ei)
+					}
+					s += ")"
+				} else {
+					s += ck + " " + opString(exp.op) + " " + "?"
+					ia = append(ia, exp.value)
+				}
+
 				if en > 1 && j < en - 1 {
 					s += " AND "
 				}
@@ -122,20 +184,26 @@ func (w *Where) SqlString() string {
 			s += " OR "
 		}
 	}
-	return s
+	return s, ia
 }
 
 func (w *Where) Values() []interface{} {
-	ia := make([]interface{}, 0)
+	var ia []interface{}
 
-	for _, c := range *w {		
-		for _, cv := range *c {		
-			for _, ei := range *cv {
+	for _, c := range *w {
+		for _, cv := range *c {
+			for j, ei := range *cv {
+				fmt.Println(j, ei.op)
+				
+				switch ei.value.(type) {
+				case []*jason.Value:
+					ei.value = valArray(ei.value)
+				default:
+				}
 				ia = append(ia, ei.value)
 			}
 		}
 	}
-
 	return ia
 }
 
@@ -172,7 +240,7 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 		ea := make([]Expression, len(eo.Map()))
 		
 		i := 0
-		for ek, ev := range eo.Map() {			
+		for ek, ev := range eo.Map() {
 			e := &Expression{}
 			e.op = ek
 			
@@ -201,8 +269,15 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 	return c, nil
 }
 
-func (w *Where) ParseWhere(str string) (err error) {	
-	root, err := jason.NewObjectFromBytes([]byte(str))
+func (f *Filter) ParseWhere(str string) (err error) {
+	sa := strings.Split(str, "=")
+	if len(sa) <= 1 || len(sa) > 2 {
+		return nil
+	}
+	
+	where := &Where{}
+	
+	root, err := jason.NewObjectFromBytes([]byte(sa[1]))
 	if err != nil {
 		fmt.Println("parse json failed")
 		return err
@@ -216,7 +291,7 @@ func (w *Where) ParseWhere(str string) (err error) {
 			return err
 		}
 
-		*w = append(*w, c)
+		*where = append(*where, c)
 	} else {
 		for _, o := range oa {
 			c, err := parseCondition(o)
@@ -225,9 +300,57 @@ func (w *Where) ParseWhere(str string) (err error) {
 				return err
 			}
 		
-			*w = append(*w, c)
+			*where = append(*where, c)
 		}
+	}
+	
+	f.where = where
+	
+	return nil
+}
+
+func (f *Filter) ParseOrder(str string) (err error) {
+	sa := strings.Split(str, "=")
+	if len(sa) <= 1 {
+		return nil
 	}
 	
 	return nil
 }
+
+func (f *Filter) ParseLimit(str string) (err error) {
+	sa := strings.Split(str, "=")
+	if len(sa) <= 1 {
+		return nil
+	}
+	
+	return nil
+}
+
+func (f *Filter) ParseSkip(str string) (err error) {
+	sa := strings.Split(str, "=")
+	if len(sa) <= 1 {
+		return nil
+	}
+	
+	return nil
+}
+
+func Parse(c *gin.Context) (f *Filter, err error) {
+	f = new(Filter)
+	where := c.Query("where")
+	f.ParseWhere(where)
+	
+	order := c.Query("order")
+	f.ParseOrder(order)
+	
+	limit := c.Query("limit")
+	f.ParseOrder(limit)
+	
+	skip := c.Query("skip")
+	f.ParseOrder(skip)
+	
+	return f, nil
+}
+
+
