@@ -136,61 +136,63 @@ func (f *Filter) SqlString() (string, []interface{}) {
 	
 	// where sql
 	
-	// condition number
-	cn := len(*f.where)
-
-	for i, conds := range *f.where {
-		// keyword number
-		kn := len(*conds)
-		ki := 0
-		
-		s += "("
-		for ck, cv := range *conds {
-			// expression number
-			en := len(*cv)
-			
-			// TODO check whether ck is a filed of struct
+	if f.where != nil {
+		// condition number
+		cn := len(*f.where)
+	
+		for i, conds := range *f.where {
+			// keyword number
+			kn := len(*conds)
+			ki := 0
 			
 			s += "("
-			for j, exp := range *cv {
-				// operation
-				if exp.op == "$in" || exp.op == "$nin" {
-					va, ok := exp.value.([]*jason.Value)
-					if !ok {
-						fmt.Println("in value wrong, not a array")
-					}
-
-					s += ck + " " + opString(exp.op) + " " + "("
-					
-					for k, ei := range valArray(exp.value) {
-						s += "?"
-						if k != len(va) - 1 {
-							s += ","
+			for ck, cv := range *conds {
+				// expression number
+				en := len(*cv)
+				
+				// TODO check whether ck is a filed of struct
+				
+				s += "("
+				for j, exp := range *cv {
+					// operation
+					if exp.op == "$in" || exp.op == "$nin" {
+						va, ok := exp.value.([]*jason.Value)
+						if !ok {
+							fmt.Println("in value wrong, not a array")
 						}
-						ia = append(ia, ei)
+	
+						s += ck + " " + opString(exp.op) + " " + "("
+						
+						for k, ei := range valArray(exp.value) {
+							s += "?"
+							if k != len(va) - 1 {
+								s += ","
+							}
+							ia = append(ia, ei)
+						}
+						s += ")"
+					} else {
+						s += ck + " " + opString(exp.op) + " " + "?"
+						ia = append(ia, exp.value)
 					}
-					s += ")"
-				} else {
-					s += ck + " " + opString(exp.op) + " " + "?"
-					ia = append(ia, exp.value)
+	
+					if en > 1 && j < en - 1 {
+						s += " AND "
+					}
 				}
-
-				if en > 1 && j < en - 1 {
+				s += ")"
+				
+				if kn > 1 && ki < kn -1{
 					s += " AND "
 				}
+	
+				ki += 1
 			}
 			s += ")"
 			
-			if kn > 1 && ki < kn -1{
-				s += " AND "
+			if cn > 1 && i < cn - 1 {
+				s += " OR "
 			}
-
-			ki += 1
-		}
-		s += ")"
-		
-		if cn > 1 && i < cn - 1 {
-			s += " OR "
 		}
 	}
 	
@@ -217,6 +219,8 @@ func (f *Filter) SqlString() (string, []interface{}) {
 	if f.skip > 0 {
 		s += "OFFSET " + strconv.FormatInt(f.skip, 10)
 	}
+	
+	fmt.Println(s, ia)
 	
 	return s, ia
 }
