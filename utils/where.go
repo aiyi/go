@@ -288,14 +288,9 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 }
 
 func (f *Filter) ParseWhere(str string) (err error) {
-	sa := strings.Split(str, "=")
-	if len(sa) <= 1 || len(sa) > 2 {
-		return nil
-	}
-	
 	where := &Where{}
 	
-	root, err := jason.NewObjectFromBytes([]byte(sa[1]))
+	root, err := jason.NewObjectFromBytes([]byte(str))
 	if err != nil {
 		fmt.Println("parse json failed")
 		return err
@@ -328,24 +323,27 @@ func (f *Filter) ParseWhere(str string) (err error) {
 }
 
 func (f *Filter) ParseOrder(str string) (err error) {
-	sa := strings.Split(str, "=")
-	if len(sa) <= 1 || len(sa) > 2 {
+	if str == "" {
 		return nil
 	}
 	
-	oa := strings.Split(sa[1], ",")
+	oa := strings.Split(str, ",")
 	
 	orders := []*Order{}
 	
 	for _, o := range oa {
-		order := &Order{}
+		if o == "" {
+			continue
+		}
 		
+		order := &Order{}
+				
 		if o[0] == '-' {
 			order.asc = false
-			order.key = o[1:]
+			order.key = string(o[1:])
 		} else {
 			order.asc = true
-			order.key = o[:]
+			order.key = o
 		}
 		
 		orders = append(orders, order)
@@ -357,23 +355,13 @@ func (f *Filter) ParseOrder(str string) (err error) {
 }
 
 func (f *Filter) ParseLimit(str string) (err error) {
-	sa := strings.Split(str, "=")
-	if len(sa) <= 1 || len(sa) > 2 {
-		return nil
-	}
-	
-	f.limit, err = strconv.ParseInt(sa[1], 10, 64)
+	f.limit, err = strconv.ParseInt(str, 10, 64)
 	
 	return err
 }
 
 func (f *Filter) ParseSkip(str string) (err error) {
-	sa := strings.Split(str, "=")
-	if len(sa) <= 1 || len(sa) > 2 {
-		return nil
-	}
-	
-	f.skip, err = strconv.ParseInt(sa[1], 10, 64)
+	f.skip, err = strconv.ParseInt(str, 10, 64)
 	
 	return err
 }
@@ -387,10 +375,10 @@ func Parse(c *gin.Context) (f *Filter, err error) {
 	f.ParseOrder(order)
 	
 	limit := c.Query("limit")
-	f.ParseOrder(limit)
+	f.ParseLimit(limit)
 	
 	skip := c.Query("skip")
-	f.ParseOrder(skip)
+	f.ParseSkip(skip)
 	
 	return f, nil
 }
