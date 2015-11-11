@@ -132,11 +132,13 @@ func opString(op string) (string) {
 
 func (f *Filter) SqlString() (string, []interface{}) {
 	var ia []interface{}
+	s := ""
+	
+	// where sql
 	
 	// condition number
 	cn := len(*f.where)
 
-	s := ""
 	for i, conds := range *f.where {
 		// keyword number
 		kn := len(*conds)
@@ -191,6 +193,31 @@ func (f *Filter) SqlString() (string, []interface{}) {
 			s += " OR "
 		}
 	}
+	
+	// order by sql
+	if len(f.orders) > 0 {
+		s += " ORDER BY "
+		
+		for i, order := range f.orders {
+			s += order.key
+			if order.asc != true {
+				s += " DESC"
+			}
+			if i < len(f.orders) - 1 {
+				s += ", "
+			}
+		}
+	}
+	
+	// limit sql
+	if f.limit > 0 {
+		s += "LIMIT " + strconv.FormatInt(f.limit, 10)
+	}
+	// skip sql
+	if f.skip > 0 {
+		s += "OFFSET " + strconv.FormatInt(f.skip, 10)
+	}
+	
 	return s, ia
 }
 
@@ -302,9 +329,11 @@ func (f *Filter) ParseOrder(str string) (err error) {
 		return nil
 	}
 	
+	oa := strings.Split(sa[1], ",")
+	
 	orders := []*Order{}
 	
-	for _, o := range sa[1:] {
+	for _, o := range oa {
 		order := &Order{}
 		
 		if o[0] == '-' {
