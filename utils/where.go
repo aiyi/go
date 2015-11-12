@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"net/url"
 	"reflect"
 	"fmt"
 	"strings"
@@ -8,7 +9,6 @@ import (
 	"encoding/json"
 	
 	"github.com/antonholmquist/jason"
-	"github.com/gin-gonic/gin"
 )
 
 // where = {key1: {op: val, op: val}, key2: {op: val, op: val}, ...}
@@ -33,8 +33,6 @@ type Filter struct {
 	unscoped        bool
 	SoftDelete      bool
 }
-
-var opMap map[string]string
 
 func valItem(item interface{}) interface{} {
 	switch item.(type) {
@@ -287,7 +285,7 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 	return c, nil
 }
 
-func (f *Filter) ParseWhere(str string) (err error) {
+func (f *Filter) parseWhere(str string) (err error) {
 	where := &Where{}
 	
 	root, err := jason.NewObjectFromBytes([]byte(str))
@@ -322,7 +320,7 @@ func (f *Filter) ParseWhere(str string) (err error) {
 	return nil
 }
 
-func (f *Filter) ParseOrder(str string) (err error) {
+func (f *Filter) parseOrder(str string) (err error) {
 	if str == "" {
 		return nil
 	}
@@ -354,31 +352,32 @@ func (f *Filter) ParseOrder(str string) (err error) {
 	return nil
 }
 
-func (f *Filter) ParseLimit(str string) (err error) {
+func (f *Filter) parseLimit(str string) (err error) {
 	f.limit, err = strconv.ParseInt(str, 10, 64)
 	
 	return err
 }
 
-func (f *Filter) ParseSkip(str string) (err error) {
+func (f *Filter) parseSkip(str string) (err error) {
 	f.skip, err = strconv.ParseInt(str, 10, 64)
 	
 	return err
 }
 
-func Parse(c *gin.Context) (f *Filter, err error) {
+func ParseFilter(query url.Values) (f *Filter, err error) {
 	f = new(Filter)
-	where := c.Query("where")
-	f.ParseWhere(where)
 	
-	order := c.Query("order")
-	f.ParseOrder(order)
+	where := query.Get("where")
+	f.parseWhere(where)
 	
-	limit := c.Query("limit")
-	f.ParseLimit(limit)
+	order := query.Get("order")
+	f.parseOrder(order)
 	
-	skip := c.Query("skip")
-	f.ParseSkip(skip)
+	limit := query.Get("limit")
+	f.parseLimit(limit)
+	
+	skip := query.Get("skip")
+	f.parseSkip(skip)
 	
 	return f, nil
 }
