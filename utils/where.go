@@ -218,8 +218,6 @@ func (f *Filter) SqlString() (string, []interface{}) {
 		s += "OFFSET " + strconv.FormatInt(f.skip, 10)
 	}
 	
-	fmt.Println(s, ia)
-	
 	return s, ia
 }
 
@@ -242,44 +240,65 @@ func (w Where) String() string {
 func parseCondition(v *jason.Object) (c *Condition, err error) {
 	conds, err := v.Object()
 	if conds == nil {
+		fmt.Println("get conds failed")
 		return nil, err
 	}
 	
 	c = &Condition{}
 			
 	for ck, cv := range conds.Map() {
+		ea := &[]Expression{}
+		
 		eo, err := cv.Object()
 		if err != nil {
-			return nil, err
-		}
-		
-		ea := make([]Expression, len(eo.Map()))
-		
-		i := 0
-		for ek, ev := range eo.Map() {
+			// cv is value
 			e := &Expression{}
-			e.op = ek
-			
-			switch ev.Interface().(type) {
+			e.op = "$eq"
+
+			switch cv.Interface().(type) {
 			case []interface{}:
-				e.value, _ = ev.Array()
+				e.value, _ = cv.Array()
 			case bool:
-				e.value, _ = ev.Boolean()
+				e.value, _ = cv.Boolean()
 			case string:
-				e.value, _ = ev.String()
+				e.value, _ = cv.String()
 			case json.Number:
-				e.value, _ = ev.Number()
+				e.value, _ = cv.Number()
 			default:
-				e.value = ev.Interface()
-				fmt.Println(ev, " unsupported type ", 
-					reflect.ValueOf(ev.Interface()).Type())
+				e.value = cv.Interface()
+				fmt.Println(cv, " unsupported type ", 
+					reflect.ValueOf(cv.Interface()).Type())
 			}
 			
-			ea[i] = *e
-			i += 1
-		}
+			*ea = append(*ea, *e)
+		} else {
+			// cv is a object
+			i := 0
+			for ek, ev := range eo.Map() {
+				e := &Expression{}
+				e.op = ek
 								
-		(*c)[ck] = &ea
+				switch ev.Interface().(type) {
+				case []interface{}:
+					e.value, _ = ev.Array()
+				case bool:
+					e.value, _ = ev.Boolean()
+				case string:
+					e.value, _ = ev.String()
+				case json.Number:
+					e.value, _ = ev.Number()
+				default:
+					e.value = ev.Interface()
+					fmt.Println(ev, " unsupported type ", 
+						reflect.ValueOf(ev.Interface()).Type())
+				}
+				
+				*ea = append(*ea, *e)
+				i += 1
+			}
+		}
+
+		(*c)[ck] = ea
 	}
 	
 	return c, nil
@@ -293,7 +312,7 @@ func (f *Filter) parseWhere(str string) (err error) {
 		fmt.Println("parse json failed")
 		return err
 	}
-		
+	
 	oa, _ := root.GetObjectArray("$or")
 	if oa == nil {
 		c, err := parseCondition(root)
