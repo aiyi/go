@@ -134,23 +134,29 @@ func (f *Filter) SqlString() (string, []interface{}) {
 	
 	// where sql
 	
-	if f.where != nil {
+	if f.where != nil && len(*f.where) > 0 {		
 		// condition number
 		cn := len(*f.where)
-	
+		
 		for i, conds := range *f.where {
 			// keyword number
 			kn := len(*conds)
 			ki := 0
 			
-			s += "("
+			if len(*conds) > 1 {
+				s += "("
+			}
+			
 			for ck, cv := range *conds {
 				// expression number
 				en := len(*cv)
 				
 				// TODO check whether ck is a filed of struct
 				
-				s += "("
+				if len(*cv) > 1 {
+					s += "("
+				}
+				
 				for j, exp := range *cv {
 					// operation
 					if exp.op == "$in" || exp.op == "$nin" {
@@ -178,7 +184,10 @@ func (f *Filter) SqlString() (string, []interface{}) {
 						s += " AND "
 					}
 				}
-				s += ")"
+				
+				if len(*cv) > 1 {
+					s += ")"
+				}
 				
 				if kn > 1 && ki < kn -1{
 					s += " AND "
@@ -186,7 +195,10 @@ func (f *Filter) SqlString() (string, []interface{}) {
 	
 				ki += 1
 			}
-			s += ")"
+			
+			if len(*conds) > 1 {
+				s += ")"
+			}
 			
 			if cn > 1 && i < cn - 1 {
 				s += " OR "
@@ -306,6 +318,11 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 
 func (f *Filter) parseWhere(str string) (err error) {
 	where := &Where{}
+	f.where = where
+
+	if str == "" {
+		return
+	}
 	
 	root, err := jason.NewObjectFromBytes([]byte(str))
 	if err != nil {
@@ -333,9 +350,7 @@ func (f *Filter) parseWhere(str string) (err error) {
 			*where = append(*where, c)
 		}
 	}
-	
-	f.where = where
-	
+		
 	return nil
 }
 
