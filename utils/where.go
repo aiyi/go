@@ -134,7 +134,9 @@ func (f *Filter) SqlString() (string, []interface{}) {
 	
 	// where sql
 	
-	if f.where != nil && len(*f.where) > 0 {		
+	if f.where != nil && len(*f.where) > 0 {
+		s += " where "
+		
 		// condition number
 		cn := len(*f.where)
 		
