@@ -30,8 +30,7 @@ type Filter struct {
 	orders          []*Order
 	skip          	int64
 	limit           int64
-	unscoped        bool
-	SoftDelete      bool
+	softDelete      bool
 }
 
 func valItem(item interface{}) interface{} {
@@ -132,19 +131,27 @@ func (f *Filter) SqlString() (string, []interface{}) {
 	var ia []interface{}
 	s := ""
 	
-	// where sql
-	
-	if f.where != nil && len(*f.where) > 0 {
+	if (f.where != nil && len(*f.where) > 0) || f.softDelete == true {
 		s += " where "
-		
+	}
+	
+	if f.softDelete {
+		s += "deleted=0 AND "
+	}
+	
+	// where sql
+	if f.where != nil && len(*f.where) > 0 {		
 		// condition number
 		cn := len(*f.where)
+		if cn > 1 {
+			s += "("
+		}
 		
 		for i, conds := range *f.where {
 			// keyword number
 			kn := len(*conds)
 			ki := 0
-			
+
 			if len(*conds) > 1 {
 				s += "("
 			}
@@ -178,7 +185,7 @@ func (f *Filter) SqlString() (string, []interface{}) {
 						}
 						s += ")"
 					} else {
-						s += ck + " " + opString(exp.op) + " " + "?"
+						s += ck + opString(exp.op) + "?"
 						ia = append(ia, exp.value)
 					}
 	
@@ -205,6 +212,10 @@ func (f *Filter) SqlString() (string, []interface{}) {
 			if cn > 1 && i < cn - 1 {
 				s += " OR "
 			}
+		}
+		
+		if cn > 1 {
+			s += ")"
 		}
 	}
 	
@@ -400,8 +411,10 @@ func (f *Filter) parseSkip(str string) (err error) {
 	return err
 }
 
-func ParseFilter(query url.Values) (f *Filter, err error) {
+func ParseFilter(query url.Values, softdelete bool) (f *Filter, err error) {
 	f = new(Filter)
+	
+	f.softDelete = softdelete
 	
 	where := query.Get("where")
 	f.parseWhere(where)
