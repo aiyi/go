@@ -239,11 +239,11 @@ func (f *Filter) SqlString() (string, []interface{}) {
 	
 	// limit sql
 	if f.limit > 0 {
-		s += "LIMIT " + strconv.FormatInt(f.limit, 10)
+		s += " LIMIT " + strconv.FormatInt(f.limit, 10)
 	}
 	// skip sql
 	if f.skip > 0 {
-		s += "OFFSET " + strconv.FormatInt(f.skip, 10)
+		s += " OFFSET " + strconv.FormatInt(f.skip, 10)
 	}
 	
 	return s, ia
