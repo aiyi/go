@@ -18,10 +18,7 @@ func SqlUpdateSetArgs(s *bytes.Buffer, para interface{}, args *[]interface{}) in
 
 		if field.IsNil() == false {
 			key := v.Type().Field(i).Tag.Get("json")
-			if key == "created" || key == "deleted" {
-				continue
-			}
-			
+						
 			if x > 0 {
 				s.WriteString(", ")
 			}
