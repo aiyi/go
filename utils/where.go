@@ -189,7 +189,7 @@ func (f *Filter) SqlString() (string, []interface{}) {
 						s += ")"
 					} else {
 						s += ck + opString(exp.op) + "?"
-						ia = append(ia, exp.value)
+						ia = append(ia, valItem(exp.value))
 					}
 	
 					if en > 1 && j < en - 1 {
