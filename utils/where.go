@@ -1,36 +1,38 @@
 package utils
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/url"
 	"reflect"
-	"fmt"
-	"strings"
 	"strconv"
-	"encoding/json"
-	
+	"strings"
+
 	"github.com/antonholmquist/jason"
 )
 
 // where = {key1: {op: val, op: val}, key2: {op: val, op: val}, ...}
 
 type Expression struct {
-	op string
+	op    string
 	value interface{}
 }
 type Condition map[string]*[]Expression
 type Where []*Condition
 
 type Order struct {
-	key	string
-	asc	bool
+	key string
+	asc bool
 }
 
 type Filter struct {
-	where			*Where
-	orders          []*Order
-	skip          	int64
-	limit           int64
-	softDelete      bool
+	where      *Where
+	orders     []*Order
+	skip       int64
+	limit      int64
+	softDelete bool
+	extraCond  []string
+	extraValue [][]interface{}
 }
 
 func valItem(item interface{}) interface{} {
@@ -61,7 +63,7 @@ func valArray(v interface{}) (a []interface{}) {
 	default:
 		fmt.Println("valArray parse failed, type: ", reflect.ValueOf(v).Type())
 	}
-	
+
 	return a
 }
 
@@ -88,10 +90,10 @@ func valString(v interface{}) (s string) {
 	case []*jason.Value:
 		a, _ := v.([]*jason.Value)
 		s = "["
-		for i, ai := range a {			
+		for i, ai := range a {
 			s += valString(ai.Interface())
-			if i < len(a) -1 {
-				s +=  ", "
+			if i < len(a)-1 {
+				s += ", "
 			}
 		}
 		s += "]"
@@ -99,11 +101,11 @@ func valString(v interface{}) (s string) {
 		fmt.Println("unknown type? don't know how to convert: ", reflect.ValueOf(v).Type())
 		s = ""
 	}
-	
+
 	return s
 }
 
-func opString(op string) (string) {
+func opString(op string) string {
 	switch op {
 	case "$eq":
 		return "="
@@ -130,26 +132,43 @@ func opString(op string) (string) {
 func (f *Filter) SqlString() (string, []interface{}) {
 	var ia []interface{}
 	s := ""
-	
-	if (f.where != nil && len(*f.where) > 0) || f.softDelete == true {
+
+	if (f.where != nil && len(*f.where) > 0) || f.softDelete == true || len(f.extraCond) > 0{
 		s += " where "
 	}
-	
+
 	if f.softDelete {
 		s += "deleted=0 "
-		if f.where != nil && len(*f.where) > 0 {
+		if len(f.extraCond) > 0 || (f.where != nil && len(*f.where) > 0) {
 			s += "AND "
 		}
 	}
 	
+	if len(f.extraCond) > 0 {
+		for i, str := range f.extraCond {
+			s += str
+			for _, arg := range f.extraValue[i] {
+				ia = append(ia, arg)
+			}
+
+			if i < len(f.extraCond) - 1 {
+				s += " AND "
+			}
+		}
+		
+		if f.where != nil && len(*f.where) > 0 {
+			s += " AND "
+		}
+	}
+
 	// where sql
-	if f.where != nil && len(*f.where) > 0 {		
+	if f.where != nil && len(*f.where) > 0 {
 		// condition number
 		cn := len(*f.where)
 		if cn > 1 {
 			s += "("
 		}
-		
+
 		for i, conds := range *f.where {
 			// keyword number
 			kn := len(*conds)
@@ -158,17 +177,17 @@ func (f *Filter) SqlString() (string, []interface{}) {
 			if len(*conds) > 1 {
 				s += "("
 			}
-			
+
 			for ck, cv := range *conds {
 				// expression number
 				en := len(*cv)
-				
+
 				// TODO check whether ck is a filed of struct
-				
+
 				if len(*cv) > 1 {
 					s += "("
 				}
-				
+
 				for j, exp := range *cv {
 					// operation
 					if exp.op == "$in" || exp.op == "$nin" {
@@ -176,12 +195,12 @@ func (f *Filter) SqlString() (string, []interface{}) {
 						if !ok {
 							fmt.Println("in value wrong, not a array")
 						}
-	
+
 						s += ck + " " + opString(exp.op) + " " + "("
-						
+
 						for k, ei := range valArray(exp.value) {
 							s += "?"
-							if k != len(va) - 1 {
+							if k != len(va)-1 {
 								s += ","
 							}
 							ia = append(ia, ei)
@@ -191,62 +210,62 @@ func (f *Filter) SqlString() (string, []interface{}) {
 						s += ck + opString(exp.op) + "?"
 						ia = append(ia, valItem(exp.value))
 					}
-	
-					if en > 1 && j < en - 1 {
+
+					if en > 1 && j < en-1 {
 						s += " AND "
 					}
 				}
-				
+
 				if len(*cv) > 1 {
 					s += ")"
 				}
-				
-				if kn > 1 && ki < kn -1{
+
+				if kn > 1 && ki < kn-1 {
 					s += " AND "
 				}
-	
+
 				ki += 1
 			}
-			
+
 			if len(*conds) > 1 {
 				s += ")"
 			}
-			
-			if cn > 1 && i < cn - 1 {
+
+			if cn > 1 && i < cn-1 {
 				s += " OR "
 			}
 		}
-		
+
 		if cn > 1 {
 			s += ")"
 		}
 	}
-	
+
 	// order by sql
 	if len(f.orders) > 0 {
 		s += " ORDER BY "
-		
+
 		for i, order := range f.orders {
 			s += order.key
 			if order.asc != true {
 				s += " DESC"
 			}
-			if i < len(f.orders) - 1 {
+			if i < len(f.orders)-1 {
 				s += ", "
 			}
 		}
 	}
-	
+
 	// limit sql
 	if f.limit > 0 {
 		s += " LIMIT " + strconv.FormatInt(f.limit, 10)
-		
+
 		// skip sql
 		if f.skip > 0 {
 			s += " OFFSET " + strconv.FormatInt(f.skip, 10)
 		}
 	}
-	
+
 	return s, ia
 }
 
@@ -255,7 +274,7 @@ func (w Where) String() string {
 	for _, c := range w {
 		s += "["
 		for ck, cv := range *c {
-			s += "{" + ck + ":" + "[";
+			s += "{" + ck + ":" + "["
 			for _, ei := range *cv {
 				s += "{" + ei.op + ":" + valString(ei.value) + "}"
 			}
@@ -272,12 +291,12 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 		fmt.Println("get conds failed")
 		return nil, err
 	}
-	
+
 	c = &Condition{}
-			
+
 	for ck, cv := range conds.Map() {
 		ea := &[]Expression{}
-		
+
 		eo, err := cv.Object()
 		if err != nil {
 			// cv is value
@@ -295,10 +314,10 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 				e.value, _ = cv.Number()
 			default:
 				e.value = cv.Interface()
-				fmt.Println(cv, " unsupported type ", 
+				fmt.Println(cv, " unsupported type ",
 					reflect.ValueOf(cv.Interface()).Type())
 			}
-			
+
 			*ea = append(*ea, *e)
 		} else {
 			// cv is a object
@@ -306,7 +325,7 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 			for ek, ev := range eo.Map() {
 				e := &Expression{}
 				e.op = ek
-								
+
 				switch ev.Interface().(type) {
 				case []interface{}:
 					e.value, _ = ev.Array()
@@ -318,10 +337,10 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 					e.value, _ = ev.Number()
 				default:
 					e.value = ev.Interface()
-					fmt.Println(ev, " unsupported type ", 
+					fmt.Println(ev, " unsupported type ",
 						reflect.ValueOf(ev.Interface()).Type())
 				}
-				
+
 				*ea = append(*ea, *e)
 				i += 1
 			}
@@ -329,8 +348,17 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 
 		(*c)[ck] = ea
 	}
-	
+
 	return c, nil
+}
+
+func (f *Filter) AddCondition(str string, vals... interface{}) {
+	f.extraCond = append(f.extraCond, str)
+	f.extraValue = append(f.extraValue, make([]interface{}, 0))
+	idx := len(f.extraCond) - 1
+	for _, val := range vals {
+		f.extraValue[idx] = append(f.extraValue[idx], val)
+	}
 }
 
 func (f *Filter) parseWhere(str string) (err error) {
@@ -340,13 +368,13 @@ func (f *Filter) parseWhere(str string) (err error) {
 	if str == "" {
 		return
 	}
-	
+
 	root, err := jason.NewObjectFromBytes([]byte(str))
 	if err != nil {
 		fmt.Println("parse json failed")
 		return err
 	}
-	
+
 	oa, _ := root.GetObjectArray("$or")
 	if oa == nil {
 		c, err := parseCondition(root)
@@ -363,11 +391,11 @@ func (f *Filter) parseWhere(str string) (err error) {
 				fmt.Println("parseCondition failed")
 				return err
 			}
-		
+
 			*where = append(*where, c)
 		}
 	}
-		
+
 	return nil
 }
 
@@ -375,18 +403,18 @@ func (f *Filter) parseOrder(str string) (err error) {
 	if str == "" {
 		return nil
 	}
-	
+
 	oa := strings.Split(str, ",")
-	
+
 	orders := []*Order{}
-	
+
 	for _, o := range oa {
 		if o == "" {
 			continue
 		}
-		
+
 		order := &Order{}
-				
+
 		if o[0] == '-' {
 			order.asc = false
 			order.key = string(o[1:])
@@ -394,45 +422,43 @@ func (f *Filter) parseOrder(str string) (err error) {
 			order.asc = true
 			order.key = o
 		}
-		
+
 		orders = append(orders, order)
 	}
-	
+
 	f.orders = orders
-	
+
 	return nil
 }
 
 func (f *Filter) parseLimit(str string) (err error) {
 	f.limit, err = strconv.ParseInt(str, 10, 64)
-	
+
 	return err
 }
 
 func (f *Filter) parseSkip(str string) (err error) {
 	f.skip, err = strconv.ParseInt(str, 10, 64)
-	
+
 	return err
 }
 
 func ParseFilter(query url.Values, softdelete bool) (f *Filter, err error) {
 	f = new(Filter)
-	
+
 	f.softDelete = softdelete
-	
+
 	where := query.Get("where")
 	f.parseWhere(where)
-	
+
 	order := query.Get("order")
 	f.parseOrder(order)
-	
+
 	limit := query.Get("limit")
 	f.parseLimit(limit)
-	
+
 	skip := query.Get("skip")
 	f.parseSkip(skip)
-	
+
 	return f, nil
 }
-
-
