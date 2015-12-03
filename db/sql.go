@@ -38,6 +38,10 @@ func SqlUpdateSetArgs(s *bytes.Buffer, para interface{}, args *[]interface{}) in
 			x++
 		}
 	}
+	
+	if x == 1 {
+		s.WriteString(" ")
+	}
 
 	return x
 }
