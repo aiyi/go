@@ -39,9 +39,7 @@ func SqlUpdateSetArgs(s *bytes.Buffer, para interface{}, args *[]interface{}) in
 		}
 	}
 	
-	if x == 1 {
-		s.WriteString(" ")
-	}
+	s.WriteString(" ")
 
 	return x
 }
