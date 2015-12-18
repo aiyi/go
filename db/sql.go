@@ -1,9 +1,9 @@
 package db
 
 import (
-	"time"
 	"bytes"
 	"reflect"
+	"time"
 )
 
 func SqlUpdateSetArgs(s *bytes.Buffer, para interface{}, args *[]interface{}) int {
@@ -16,9 +16,9 @@ func SqlUpdateSetArgs(s *bytes.Buffer, para interface{}, args *[]interface{}) in
 			continue
 		}
 
-		if field.IsNil() == false {
-			key := v.Type().Field(i).Tag.Get("json")
-						
+		key := v.Type().Field(i).Tag.Get("json")
+
+		if field.IsNil() == false || key == "modified" {
 			if x > 0 {
 				s.WriteString(", ")
 			}
@@ -38,7 +38,7 @@ func SqlUpdateSetArgs(s *bytes.Buffer, para interface{}, args *[]interface{}) in
 			x++
 		}
 	}
-	
+
 	s.WriteString(" ")
 
 	return x
