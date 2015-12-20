@@ -123,6 +123,8 @@ func opString(op string) string {
 		return "IN"
 	case "$nin":
 		return "NOT IN"
+	case "$like":
+		return "LIKE"
 	default:
 		fmt.Println(op, " not found")
 		return ""
@@ -133,7 +135,7 @@ func (f *Filter) SqlString() (string, []interface{}) {
 	var ia []interface{}
 	s := ""
 
-	if (f.where != nil && len(*f.where) > 0) || f.softDelete == true || len(f.extraCond) > 0{
+	if (f.where != nil && len(*f.where) > 0) || f.softDelete == true || len(f.extraCond) > 0 {
 		s += " where "
 	}
 
@@ -143,7 +145,7 @@ func (f *Filter) SqlString() (string, []interface{}) {
 			s += "AND "
 		}
 	}
-	
+
 	if len(f.extraCond) > 0 {
 		for i, str := range f.extraCond {
 			s += str
@@ -151,11 +153,11 @@ func (f *Filter) SqlString() (string, []interface{}) {
 				ia = append(ia, arg)
 			}
 
-			if i < len(f.extraCond) - 1 {
+			if i < len(f.extraCond)-1 {
 				s += " AND "
 			}
 		}
-		
+
 		if f.where != nil && len(*f.where) > 0 {
 			s += " AND "
 		}
@@ -206,6 +208,9 @@ func (f *Filter) SqlString() (string, []interface{}) {
 							ia = append(ia, ei)
 						}
 						s += ")"
+					} else if exp.op == "$like" {
+						s += ck + " " + opString(exp.op) + " ?"
+						ia = append(ia, valItem(exp.value))
 					} else {
 						s += ck + opString(exp.op) + "?"
 						ia = append(ia, valItem(exp.value))
@@ -352,7 +357,7 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 	return c, nil
 }
 
-func (f *Filter) AddCondition(str string, vals... interface{}) {
+func (f *Filter) AddCondition(str string, vals ...interface{}) {
 	f.extraCond = append(f.extraCond, str)
 	f.extraValue = append(f.extraValue, make([]interface{}, 0))
 	idx := len(f.extraCond) - 1
