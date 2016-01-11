@@ -318,9 +318,12 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 			case json.Number:
 				e.value, _ = cv.Number()
 			default:
-				e.value = cv.Interface()
-				fmt.Println(cv, " unsupported type ",
-					reflect.ValueOf(cv.Interface()).Type())
+				continue
+				/*
+					e.value = cv.Interface()
+					fmt.Println(cv, " unsupported type ",
+						reflect.ValueOf(cv.Interface()).Type())
+				*/
 			}
 
 			*ea = append(*ea, *e)
@@ -341,9 +344,12 @@ func parseCondition(v *jason.Object) (c *Condition, err error) {
 				case json.Number:
 					e.value, _ = ev.Number()
 				default:
-					e.value = ev.Interface()
-					fmt.Println(ev, " unsupported type ",
-						reflect.ValueOf(ev.Interface()).Type())
+					continue
+					/*
+						e.value = ev.Interface()
+						fmt.Println(ev, " unsupported type ",
+							reflect.ValueOf(ev.Interface()).Type())
+					*/
 				}
 
 				*ea = append(*ea, *e)
