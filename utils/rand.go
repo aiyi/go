@@ -10,10 +10,6 @@ import (
 	"time"
 )
 
-var (
-	defaultRand = rand.New(rand.NewSource(time.Now().UnixNano()))
-)
-
 // Creates a random string based on a variety of options, using
 // supplied source of randomness.
 //
@@ -98,7 +94,8 @@ func RandomSpec0(count uint, start, end int, letters, numbers bool,
 // Param numbers - if true, generated string will include
 //                 numeric characters
 func RandomSpec1(count uint, start, end int, letters, numbers bool) string {
-	return RandomSpec0(count, start, end, letters, numbers, nil, defaultRand)
+	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return RandomSpec0(count, start, end, letters, numbers, nil, rand)
 }
 
 // Creates a random string whose length is the number of characters specified.
@@ -120,7 +117,8 @@ func RandomString(count uint) string {
 }
 
 func RandomStringSpec0(count uint, set []rune) string {
-	return RandomSpec0(count, 0, len(set)-1, false, false, set, defaultRand)
+	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return RandomSpec0(count, 0, len(set)-1, false, false, set, rand)
 }
 
 func RandomStringSpec1(count uint, set string) string {
