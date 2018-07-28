@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/jmoiron/sqlx"
+	"time"
 )
 
 var (
@@ -18,6 +19,8 @@ var (
 
 	namedStmtSetRWMutex sync.RWMutex
 	namedStmtSet        = make(map[string]*sqlx.NamedStmt) // map[query]*sqlx.NamedStmt
+
+	ticker *time.Ticker
 )
 
 func SetDB(d *sqlx.DB) {
@@ -102,4 +105,13 @@ func GetNamedStmt(query string) (stmt *sqlx.NamedStmt, err error) {
 	}
 	namedStmtSet[query] = stmt
 	return
+}
+
+func CleanStatement() {
+	ticker = time.NewTicker(time.Hour * 12)
+	go func () {
+		for _ = range ticker.C {
+			CloseAllStmt()
+		}
+	}()
 }
